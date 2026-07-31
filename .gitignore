@@ -1,0 +1,6 @@
+node_modules/
+out/
+public/runs/
+py/.venv/
+.DS_Store
+*.log

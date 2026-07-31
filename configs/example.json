@@ -1,0 +1,56 @@
+{
+  "slug": "daft-punk-get-lucky",
+
+  "music": {
+    "url": "https://www.youtube.com/watch?v=5NV6Rdv1a3I",
+    "start": "01:12.0",
+    "end": "01:32.0"
+  },
+
+  "clips": [
+    {
+      "label": "artiste",
+      "url": "https://www.youtube.com/watch?v=5NV6Rdv1a3I",
+      "start": "01:12.0",
+      "duration": 10
+    },
+    {
+      "label": "ville de nuit",
+      "url": "https://www.youtube.com/watch?v=5NV6Rdv1a3I",
+      "start": "02:30.0",
+      "duration": 10
+    }
+  ],
+
+  "transition": { "fadeToBlackSec": 0.6 },
+
+  "track": {
+    "title": "Get Lucky",
+    "artist": "Daft Punk",
+    "lang": "en",
+    "lrclibId": null
+  },
+
+  "lyrics": {
+    "wordsPerPage": 3,
+    "maxLineDurationSec": 6,
+    "uppercase": true
+  },
+
+  "style": {
+    "neonColor": "#00E5FF",
+    "idleColor": "#FFFFFF",
+    "idleOpacity": 0.35,
+    "fontSize": 110,
+    "bottomOffset": 420
+  },
+
+  "rain": {
+    "enabled": true,
+    "intensity": 0.6,
+    "angleDeg": 12,
+    "opacity": 0.5
+  },
+
+  "fps": 30
+}
