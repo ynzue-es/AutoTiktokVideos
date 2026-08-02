@@ -19,10 +19,13 @@ Outils système (déjà installés sur cette machine) :
   sont rendus en PIL, ne pas compter sur le filtre `subtitles`)
 - **yt-dlp** (fallback audio)
 
-Secret : token Apify dans `.env` à la racine (gitignoré) :
+Secrets dans `.env` à la racine (gitignoré) :
 
 ```
 APIFY_TOKEN=apify_api_xxxxxxxxxxxxxxxxx
+ZERNIO_API_KEY=sk_xxxxxxxx          # publication (étape 7)
+ZERNIO_TIKTOK_ACCOUNT=xxxxxxxx      # accountId TikTok (GET /api/v1/accounts)
+ZERNIO_IG_ACCOUNT=xxxxxxxx          # accountId Instagram (compte Business requis)
 ```
 
 Le logo doit être dans `assets/logo.png` (M noir sur fond blanc/transparent).
@@ -123,6 +126,69 @@ Régénérer après n'importe quelle modif de texte/traduction : `python3 batch.
 
 ---
 
+## 7. Publier / programmer sur TikTok + Instagram  →  Zernio
+
+Publication via **Zernio** (API REST, gratuit pour 2 comptes) : Zernio héberge la
+vidéo et gère l'auth des plateformes — **pas de Make, pas de stockage externe, pas
+d'app Meta/TikTok à faire valider**. Flux par vidéo : `presign → PUT upload →
+POST /posts` (TikTok + IG).
+
+Clés dans `.env` : `ZERNIO_API_KEY`, `ZERNIO_TIKTOK_ACCOUNT`, `ZERNIO_IG_ACCOUNT`
+(récupérer les accountId via `GET https://zernio.com/api/v1/accounts`).
+
+```bash
+npx tsx src/post.ts                         # DRY-RUN (défaut) : montre le planning, ne poste rien
+npx tsx src/post.ts --go --schedule         # PROGRAMME 1/jour à 19h (Paris) dès demain
+npx tsx src/post.ts --go --now --only 02    # publie 1 vidéo tout de suite (test)
+npx tsx src/post.ts --go --schedule --start 2026-09-01   # démarre la vague à une date précise
+```
+
+- **Sécurité** : sans `--go`, rien n'est posté (dry-run). Toujours vérifier l'aperçu d'abord.
+- **Ordre** : trié par vues d'origine (meilleures d'abord), via `library/index.json`.
+- **Cadence** : constante `SLOTS` en haut de `src/post.ts` (`["19:00"]` = 1/jour ;
+  mettre `["12:30","18:00","21:00"]` pour 3/jour). Créneaux = heure de Paris.
+- **Journal anti-doublon** : `render/posted.json` liste les vidéos déjà planifiées ;
+  elles sont automatiquement sautées aux vagues suivantes (`--force` pour outrepasser).
+- **Légende** = titre FR + hashtags (constante `HASHTAGS` dans `src/post.ts`).
+- **IG >90s** : les vidéos de plus de 90s partent sur TikTok seulement (limite Reels).
+
+**Gérer/annuler un post planifié** (récupère l'id dans la sortie du script) :
+```bash
+KEY=$(grep '^ZERNIO_API_KEY=' .env | cut -d= -f2)
+curl -X DELETE -H "Authorization: Bearer $KEY" https://zernio.com/api/v1/posts/<ID>
+```
+
+---
+
+## 🔁 Refaire une vague plus tard (grossir + continuer à poster)
+
+Quand ça marche et qu'on veut enchaîner avec du nouveau contenu — **simple et rapide** :
+
+```bash
+# 1. Re-scraper les derniers reels du compte source (nouveaux depuis la dernière fois)
+npx tsx src/scrape-reels.ts sonotradehq 30
+
+# 2. Prépa + transcription
+cd render && python3 prep.py && python3 augment_prep.py && python3 transcribe_all.py && cd ..
+
+# 3. Traduire À LA MAIN les NOUVELLES vidéos :
+#    - lire scratch-frames/read-NN.png -> ajouter les entrées dans render/translations.json
+#    - compléter la table FR dans render/build_subs.py pour les clips parlés
+cd render && python3 build_subs.py && python3 batch.py && cd ..
+
+# 4. Programmer UNIQUEMENT les nouvelles (le journal saute celles déjà postées),
+#    en démarrant après la file en cours :
+npx tsx src/post.ts --schedule --start 2026-08-31          # aperçu
+npx tsx src/post.ts --go --schedule --start 2026-08-31     # go
+```
+
+Le journal `render/posted.json` garantit qu'on ne reposte jamais une vidéo déjà
+programmée, même si le scrape ramène les mêmes fichiers. Seules les nouvelles
+partent. Les 2 seules étapes manuelles restent **la traduction du titre** et **des
+sous-titres** — le reste est automatique.
+
+---
+
 ## Cas particuliers / décisions par défaut
 
 - **Reels sans parole** (concert, musique, danse) → pas de sous-titres.
@@ -150,6 +216,7 @@ Régénérer après n'importe quelle modif de texte/traduction : `python3 batch.
 assets/logo.png            logo M (fourni)
 .env                       APIFY_TOKEN (gitignoré)
 src/scrape-reels.ts        étape 1 (scrape + fallback yt-dlp)
+src/post.ts                étape 7 (publie/programme via Zernio)
 library/                   mp4 bruts + index.json (gitignoré)
 render/
   detect.py                détection bloc vidéo (haut/bas)
@@ -160,6 +227,7 @@ render/
   subtitles.py             découpe cues + PNG sous-titres
   tweet_overlay.py         moteur d'overlay (header, footer, subs)
   batch.py                 rendu final → out/fr/
+  posted.json              journal anti-doublon des vidéos déjà programmées
 montage/                   utilitaires ffmpeg (crop vertical) — réserve
 out/fr/                    vidéos finales (gitignoré)
 ```
