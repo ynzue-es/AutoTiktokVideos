@@ -1,33 +1,14 @@
 {
   "name": "auto-tiktok-videos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Pipeline local de generation de videos verticales 1080x1920 avec paroles neon synchronisees",
+  "description": "Scraping Instagram (Apify) -> montage vidéo vertical",
   "scripts": {
-    "dev": "remotion studio src/remotion/index.ts",
-    "run": "tsx src/pipeline/run.ts",
-    "step:download": "tsx src/pipeline/1-download.ts",
-    "step:cut": "tsx src/pipeline/2-cut.ts",
-    "step:lyrics": "tsx src/pipeline/3-lyrics.ts",
-    "step:render": "tsx src/pipeline/4-render.ts",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@remotion/bundler": "^4.0.503",
-    "@remotion/captions": "^4.0.0",
-    "@remotion/cli": "^4.0.0",
-    "@remotion/layout-utils": "^4.0.0",
-    "@remotion/media-utils": "^4.0.0",
-    "@remotion/renderer": "^4.0.0",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "remotion": "^4.0.0",
-    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "@types/react": "19.2.7",
     "tsx": "^4.19.2",
     "typescript": "5.9.3"
   }

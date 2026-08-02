@@ -1,6 +1,8 @@
 node_modules/
 out/
-public/runs/
-py/.venv/
+library/
+.env
 .DS_Store
 *.log
+scratch-frames/
+__pycache__/

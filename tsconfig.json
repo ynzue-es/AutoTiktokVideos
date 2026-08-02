@@ -12,7 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
-    "types": ["node", "react"]
+    "types": ["node"]
   },
-  "include": ["src", "remotion.config.ts"]
+  "include": ["montage", "src"]
 }
