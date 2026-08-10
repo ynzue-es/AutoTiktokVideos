@@ -4,6 +4,11 @@
  *
  * Usage :
  *   APIFY_TOKEN=xxx npx tsx src/scrape-reels.ts sonotradehq 30
+ *   npx tsx src/scrape-reels.ts rap.minute 20 --lib library/rapminute
+ *
+ * --lib <dir> : dossier de sortie (défaut "library"). Un dossier par compte
+ * source, sinon la purge des orphelins en fin de run efface les mp4 de l'autre
+ * compte et index.json est écrasé.
  *
  * Le token peut aussi vivre dans un fichier .env (APIFY_TOKEN=...).
  */
@@ -15,7 +20,12 @@ import { pipeline } from "node:stream/promises";
 import path from "node:path";
 
 const ACTOR = "apify~instagram-reel-scraper";
-const LIBRARY = path.resolve("library");
+
+// --lib <dir> : un dossier par compte source (voir en-tête).
+const libFlag = process.argv.indexOf("--lib");
+const LIBRARY = path.resolve(
+  libFlag !== -1 && process.argv[libFlag + 1] ? process.argv[libFlag + 1] : "library",
+);
 
 // ---- token -----------------------------------------------------------
 const loadToken = (): string => {
@@ -133,7 +143,8 @@ const redownloadWithAudio = (postUrl: string, dest: string): boolean => {
 // ---- main ------------------------------------------------------------
 const main = async () => {
   const username = process.argv[2] ?? "sonotradehq";
-  const limit = Number(process.argv[3] ?? 30);
+  const limit = Number(process.argv[3]) || 30; // argv[3] peut être "--lib"
+  console.log(`→ dossier de sortie : ${path.relative(process.cwd(), LIBRARY) || "."}`);
   const token = loadToken();
 
   await mkdir(LIBRARY, { recursive: true });
