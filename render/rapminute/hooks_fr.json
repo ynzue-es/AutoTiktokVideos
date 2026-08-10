@@ -1,0 +1,26 @@
+{
+  "_doc": [
+    "Notre hook par reel, il remplace celui de rap.minute.",
+    "Les mots entre *asterisques* sortent en violet fluo (leur equivalent du vert).",
+    "Le texte est passe en MAJUSCULES au rendu, l'ecrire en minuscules est ok.",
+    "Retirer une entree = le reel n'est pas rendu.",
+    "Exclus volontairement : 01 et 19 (autre format, sous-titre de bout en bout /",
+    "video repostee d'un autre compte), 04 et 07 (aucun hook + outro promo)."
+  ],
+  "00-DbqcRtLIdKG.mp4": "l'anecdote de *naza* coincé dans le même *avion* que *booba* 😂",
+  "02-DbvreTEA9lo.mp4": "l'agent de *sécurité* a profité du concert de *jul* à fond 🤣",
+  "03-DbsRRreAw5-.mp4": "le jour où *zola* découvre le *tatouage* d'une *fan* 😭",
+  "05-DbwZzX5gDor.mp4": "*rk* dévoile sa *demande en mariage* à *aya nakamura* 💍",
+  "06-DbppNuiAmox.mp4": "*la mano* profite à fond de ses *vacances* 🤣",
+  "08-DbfXDLQorCG.mp4": "*plk* et ses galères de *micro* en showcase 😭",
+  "09-DbYhH07A9Pf.mp4": "*guizmo* lâche une perf énorme sur *colors* 😮‍💨",
+  "10-Dbaa9H4gq7-.mp4": "*michael olise* profite à fond de ses *vacances* 😭",
+  "11-Dbcu4MFoA0_.mp4": "quand un fan *prank* *bigflo* en pleine rue 😂",
+  "12-DbaNgedIfNm.mp4": "*freeze corleone* mal à l'aise devant *mounir moons* 😂",
+  "13-DbnbfhCguQA.mp4": "la réaction de *travis scott* quand le dj lance *son morceau* à ibiza 🤯",
+  "14-Dba6bCBoeJr.mp4": "le *commentateur* s'est trompé de nom sur le joueur 😂",
+  "15-Dbkg605AK7d.mp4": "*houdi* réagit à ses propres *punchlines* 😂",
+  "16-Dbh8FSFgsaQ.mp4": "*booba* qui donnait son avis sur la musique de *sch* 😐",
+  "17-DbXopBpoRoc.mp4": "les concerts d'*hatik* sont vraiment *étranges* 😅",
+  "18-DbYLBtuoLnj.mp4": "la réaction de *beendo z* quand *wejdene* l'appelait « bébé » 🤣"
+}
