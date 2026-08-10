@@ -11,9 +11,17 @@
  *   npx tsx src/post.ts                      # dry-run, toutes les vidéos
  *   npx tsx src/post.ts --only 01-...mp4     # une seule vidéo
  *   npx tsx src/post.ts --limit 1 --go --now # publie 1 vidéo maintenant
- *   npx tsx src/post.ts --go --schedule      # planifie 1/jour à 18h (Europe/Paris)
+ *   npx tsx src/post.ts --go --schedule      # planifie 1/jour à 19h (Europe/Paris)
  *
- * Clés lues dans .env : ZERNIO_API_KEY, ZERNIO_TIKTOK_ACCOUNT, ZERNIO_IG_ACCOUNT
+ *   # pipeline B (rap.minute) sur la cle BOUTIQUE, 1/jour a 7h :
+ *   npx tsx src/post.ts --project rapminute --key BOUTIQUE --schedule --slots 07:00
+ *
+ * --project : jeu de chemins (voir PROJECTS). Defaut "fr".
+ * --key     : suffixe de cle .env. Defaut "" -> ZERNIO_API_KEY /
+ *             ZERNIO_TIKTOK_ACCOUNT / ZERNIO_IG_ACCOUNT.
+ *             "BOUTIQUE" -> ZERNIO_API_KEY_BOUTIQUE / ..._BOUTIQUE.
+ *             Un workspace sans compte IG poste sur TikTok seulement.
+ * --slots   : creneaux/jour, ex "07:00" ou "12:30,18:00,21:00" (heure de Paris).
  */
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -21,33 +29,78 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 const API = "https://zernio.com/api/v1";
-const OUT = path.resolve("out", "fr");
 const TZ = "Europe/Paris";
-const SLOTS = ["19:00"]; // créneaux/jour (heure de Paris) — 1/jour pour chauffer
 
-// Hashtags ajoutés à chaque légende (éditable).
-const HASHTAGS = "#musique #rap #hiphop #rapfr #lemursonore";
+/**
+ * Un "projet" = une source de vidéos + son fichier de textes + son journal.
+ * texts: "pairs"  -> [{file, fr}]        (translations.json, pipeline A)
+ *        "map"    -> {file: "texte"}     (hooks_fr.json, pipeline B)
+ */
+const PROJECTS: Record<string, {
+  out: string; texts: string; kind: "pairs" | "map";
+  index: string; ledger: string; hashtags: string;
+}> = {
+  fr: {
+    out: "out/fr",
+    texts: "render/translations.json", kind: "pairs",
+    index: "library/index.json",
+    ledger: "render/posted.json",
+    hashtags: "#musique #rap #hiphop #rapfr #lemursonore",
+  },
+  rapminute: {
+    out: "out/rapminute",
+    texts: "render/rapminute/hooks_fr.json", kind: "map",
+    index: "library/rapminute/index.json",
+    ledger: "render/rapminute/posted.json",
+    hashtags: "#rap #rapfr #hiphop #musique #lemursonore",
+  },
+  skyrock: {
+    out: "out/skyrock",
+    texts: "render/skyrock/captions_fr.json", kind: "map",
+    index: "library/skyrockfm/index.json",
+    ledger: "render/skyrock/posted.json",
+    hashtags: "#rap #rapfr #freestyle #musique #lemursonore",
+  },
+  rvpfr: {
+    out: "out/rvpfr",
+    texts: "render/rvpfr/captions_fr.json", kind: "map",
+    index: "library/rvpfr/index.json",
+    ledger: "render/rvpfr/posted.json",
+    hashtags: "#rap #rapfr #hiphop #actu #lemursonore",
+  },
+};
+
+// ---- args ------------------------------------------------------------
+const args = process.argv.slice(2);
+const has = (f: string) => args.includes(f);
+const val = (f: string) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : undefined; };
+
+const PROJECT = val("--project") ?? "fr";
+const P = PROJECTS[PROJECT];
+if (!P) throw new Error(`--project inconnu : ${PROJECT} (dispo : ${Object.keys(PROJECTS).join(", ")})`);
+const OUT = path.resolve(P.out);
+const HASHTAGS = P.hashtags;
+const SLOTS = (val("--slots") ?? "19:00").split(",").map((s) => s.trim()).filter(Boolean);
 
 // ---- config / env ----------------------------------------------------
-const env = (k: string): string => {
+const env = (k: string, optional = false): string => {
   if (process.env[k]) return process.env[k]!;
   const p = path.resolve(".env");
   if (existsSync(p)) {
     const line = readFileSync(p, "utf8").split("\n").find((l) => l.startsWith(k + "="));
     if (line) return line.slice(k.length + 1).trim();
   }
+  if (optional) return "";
   throw new Error(`${k} manquant dans .env`);
 };
 
-const KEY = env("ZERNIO_API_KEY");
-const IG = env("ZERNIO_IG_ACCOUNT");
-const TT = env("ZERNIO_TIKTOK_ACCOUNT");
+// --key BOUTIQUE -> ZERNIO_API_KEY_BOUTIQUE, ZERNIO_TIKTOK_ACCOUNT_BOUTIQUE, ...
+const SUF = val("--key") ? `_${val("--key")}` : "";
+const KEY = env(`ZERNIO_API_KEY${SUF}`);
+const TT = env(`ZERNIO_TIKTOK_ACCOUNT${SUF}`);
+const IG = env(`ZERNIO_IG_ACCOUNT${SUF}`, true);   // absent = workspace sans IG
 const H = { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
 
-// ---- args ------------------------------------------------------------
-const args = process.argv.slice(2);
-const has = (f: string) => args.includes(f);
-const val = (f: string) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : undefined; };
 const GO = has("--go");
 const NOW = has("--now");
 const SCHEDULE = has("--schedule");
@@ -57,7 +110,7 @@ const START = val("--start");   // "YYYY-MM-DD" : jour du 1er post (défaut : de
 const FORCE = has("--force");   // ignore le journal (reposte même si déjà planifié)
 
 // journal des vidéos déjà planifiées (évite les doublons entre vagues)
-const LEDGER = path.resolve("render", "posted.json");
+const LEDGER = path.resolve(P.ledger);
 const loadLedger = (): Set<string> =>
   new Set(existsSync(LEDGER) ? (JSON.parse(readFileSync(LEDGER, "utf8")) as string[]) : []);
 const saveLedger = (s: Set<string>) =>
@@ -70,7 +123,9 @@ const durationSec = (file: string): number =>
     "-of", "default=noprint_wrappers=1:nokey=1", file,
   ], { encoding: "utf8" }).stdout.trim());
 
-const caption = (fr: string): string => `${fr}\n\n${HASHTAGS}`;
+// les hooks du pipeline B portent un balisage *mot* (violet) : on le retire
+const clean = (s: string): string => s.replace(/\*/g, "");
+const caption = (fr: string): string => `${clean(fr)}\n\n${HASHTAGS}`;
 
 const presign = async (filename: string): Promise<{ uploadUrl: string; publicUrl: string }> => {
   const r = await fetch(`${API}/media/presign`, {
@@ -91,7 +146,7 @@ const upload = async (uploadUrl: string, file: string): Promise<void> => {
 
 const buildBody = (publicUrl: string, cap: string, igOk: boolean, when?: string) => {
   const platforms: any[] = [{ platform: "tiktok", accountId: TT }];
-  if (igOk) platforms.push({
+  if (igOk && IG) platforms.push({
     platform: "instagram", accountId: IG,
     platformSpecificData: { shareToFeed: true },
   });
@@ -140,14 +195,17 @@ const scheduleFor = (index: number): string => {
 
 // ---- main ------------------------------------------------------------
 const main = async () => {
-  const trans: { file: string; fr: string }[] = JSON.parse(
-    readFileSync(path.resolve("render", "translations.json"), "utf8"),
+  const raw = JSON.parse(readFileSync(path.resolve(P.texts), "utf8"));
+  const frByFile = new Map<string, string>(
+    P.kind === "pairs"
+      ? (raw as { file: string; fr: string }[]).map((t) => [t.file, t.fr])
+      : Object.entries(raw as Record<string, unknown>)
+          .filter(([k, v]) => !k.startsWith("_") && typeof v === "string") as [string, string][],
   );
-  const frByFile = new Map(trans.map((t) => [t.file, t.fr]));
 
-  // tri par vues d'origine (meilleures d'abord), depuis library/index.json
+  // tri par vues d'origine (meilleures d'abord), depuis l'index de la librairie
   const views = new Map<string, number>();
-  const idxPath = path.resolve("library", "index.json");
+  const idxPath = path.resolve(P.index);
   if (existsSync(idxPath)) {
     for (const r of JSON.parse(readFileSync(idxPath, "utf8")) as any[]) {
       views.set(r.file, r.views ?? 0);
@@ -159,6 +217,8 @@ const main = async () => {
   files = files.slice(0, LIMIT);
 
   console.log(`${GO ? "🚀 PUBLICATION" : "🧪 DRY-RUN (rien ne sera posté)"} — ${files.length} vidéo(s)`);
+  console.log(`Projet : ${PROJECT} (${P.out})  ·  clé : ZERNIO_API_KEY${SUF}`);
+  console.log(`Cibles : TikTok${IG ? " + Instagram" : " seulement (aucun compte IG sur ce workspace)"}`);
   const modeStr = NOW ? "immédiat"
     : SCHEDULE ? `planifié ${SLOTS.length}/jour (${SLOTS.join(", ")}, ${TZ}), tri par vues`
     : "immédiat (défaut)";
@@ -175,10 +235,12 @@ const main = async () => {
     const igOk = dur <= 90;
     const cap = caption(fr);
     const when = SCHEDULE ? scheduleFor(i) : undefined;
-    const targets = ["TikTok", igOk ? "Instagram" : "(IG sauté >90s)"].join(" + ");
+    const targets = !IG ? "TikTok"
+      : `TikTok + ${igOk ? "Instagram" : "(IG sauté >90s)"}`;
 
     console.log(`▶ ${f}  [${dur.toFixed(0)}s → ${targets}]${when ? `  @ ${when.slice(0, 16)}` : ""}`);
-    console.log(`    légende: ${fr.slice(0, 70)}${fr.length > 70 ? "…" : ""}`);
+    const shown = clean(fr);   // ce qui partira vraiment (balisage *…* retiré)
+    console.log(`    légende: ${shown.slice(0, 70)}${shown.length > 70 ? "…" : ""}`);
 
     if (!GO) { console.log("    (dry-run : pas d'upload ni de post)\n"); i++; continue; }
 
