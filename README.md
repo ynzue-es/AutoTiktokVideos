@@ -189,6 +189,169 @@ sous-titres** — le reste est automatique.
 
 ---
 
+## 🟣 Pipeline B — rap.minute → DA violet fluo (`render/rapminute/`)
+
+Deuxième chaîne, **indépendante** de la première. Pas de traduction, pas de
+sous-titres : rap.minute poste des reels FR avec un **hook** (texte blanc bold
+condensé majuscule, mots-clés en vert `#00D392`, barre verticale verte à gauche)
+affiché pendant les ~5-8 premières secondes. On **couvre cette zone** d'une bande
+opaque et on **réécrit notre texte** dans la même grammaire, en violet.
+
+```bash
+# 1. Scraper dans un dossier ISOLE (--lib obligatoire, voir avertissement plus bas)
+npx tsx src/scrape-reels.ts rap.minute 20 --lib library/rapminute
+
+# 2. Detection : couleur de marque -> zone + timing du hook
+cd render/rapminute
+python3 detect_green.py     # bbox des pixels verts     -> green.json
+python3 detect_hook.py      # bloc de texte complet     -> hooks.json
+
+# 3. Ecrire NOS hooks a la main dans hooks_fr.json (seule etape manuelle)
+
+# 4. Rendu + controle qualite
+python3 batch.py            # tout            -> out/rapminute/
+python3 batch.py 00 13      # juste ces prefixes (preview rapide)
+python3 verify.py           # 0 pixel vert residuel dans les sorties ?
+```
+
+⚠️ **`--lib` n'est pas optionnel en pratique.** `scrape-reels.ts` purge en fin de
+run tous les `.mp4` absents du nouvel index et écrase `index.json`. Scraper un
+2e compte dans `library/` **détruirait** la librairie sonotradehq. Un dossier par
+compte source.
+
+**Pourquoi deux détecteurs.** Le vert de marque est rare, donc facile à isoler —
+mais sa bbox ne couvre que les *mots-clés*, pas les lignes entièrement blanches.
+`detect_hook.py` repart de cette bbox et étend au bloc réel. Le piège : un seuil
+« pixel blanc » attrape aussi le décor clair (gradins, murs, ciel). Le
+discriminant qui marche est **la stabilité temporelle** — le texte est immobile,
+le décor bouge : on prend l'**intersection** des masques sur la fin du segment
+(fin seulement, car le texte s'écrit mot par mot).
+
+**Balisage du texte** (`hooks_fr.json`) : les mots entre `*astérisques*` sortent
+en violet, tout le reste en blanc. Le texte est passé en majuscules au rendu.
+
+```json
+"13-DbnbfhCguQA.mp4": "la réaction de *travis scott* quand le dj lance *son morceau* à ibiza 🤯"
+```
+
+**Style** (constantes en haut de `hook_overlay.py`) : violet `#8B00FF`, bande
+`#0A0012` + filet néon bas, Avenir Next Condensed Heavy, géométrie calée sur la
+leur (`MARGIN=66` à 720px de large, `LINE_H=38`). La bande s'agrandit toute
+seule si notre texte prend plus de lignes que le leur. Audio d'origine conservé.
+
+### Publier le pipeline B
+
+`src/post.ts` est multi-projet et multi-compte :
+
+```bash
+# aperçu (dry-run) puis go — 1/jour à 12h30 sur la clé BOUTIQUE
+npx tsx src/post.ts --project rapminute --key BOUTIQUE --schedule --slots 12:30
+npx tsx src/post.ts --project rapminute --key BOUTIQUE --schedule --slots 12:30 --go
+```
+
+- `--project` : jeu de chemins (`fr` = pipeline A, `rapminute` = pipeline B).
+  Chaque projet a **son propre journal anti-doublon**.
+- `--key SUFFIXE` : lit `ZERNIO_API_KEY_SUFFIXE` & co. Sans `--key`, clé par défaut.
+- `--slots` : créneaux/jour, ex `07:00` ou `12:30,18:00,21:00` (heure de Paris).
+- Un workspace **sans compte Instagram** poste sur TikTok seulement (détecté tout seul).
+- Les astérisques du balisage `*mot*` sont retirées de la légende publiée.
+
+⚠️ L'API Zernio renvoie `scheduledFor` en **UTC**. En été, 12h30 Paris s'affiche
+`10:30` — c'est normal, pas un décalage à corriger.
+
+**Reels écartés du lot de 20** (absents de `hooks_fr.json`) :
+
+| Reel | Raison |
+|---|---|
+| `01` | Sous-titré en pilules vertes de bout en bout — autre format |
+| `19` | Vidéo repostée d'un autre compte (quiz « Smugglers Society ») |
+| `04`, `07` | Aucun hook au début, uniquement l'outro promo rap.minute |
+
+Pour récupérer `04`/`07` : leur écrire un hook, puis couper l'outro via
+`trim_end` (déjà supporté par `hook_overlay.render`).
+
+---
+
+## 🎙️ Pipeline C — skyrockfm → LeMurSonore (`render/skyrock/`)
+
+Troisième chaîne. skyrockfm incruste un **bandeau de marque en haut à droite**
+(SKYROCK / PLANÈTE RAP / PR+ / LE RÉCAP / KARAOKE BOX) : on le recouvre d'un
+badge LeMurSonore. Deux formats coexistent dans le compte :
+
+| Format | Reels | Traitement |
+|---|---|---|
+| **studio** (artiste au micro) | 00-04, 08, 11, 14-19 | badge logo seul |
+| **LE RÉCAP** (présentateur en voix off) | 05, 06, 07, 09, 10, 13 | badge + **coupe de l'intro** + rectangle de texte |
+| **karaoke** | 12 | badge logo seul |
+
+Sur les LE RÉCAP, un présentateur ouvre la vidéo face caméra. On **coupe toute
+son intro** et on affiche à la place son propos reformulé dans un rectangle de
+texte, pendant 4,5 s.
+
+```bash
+npx tsx src/scrape-reels.ts skyrockfm 20 --lib library/skyrockfm
+
+cd render/skyrock
+python3 detect_logo.py        # degrossit la zone du bandeau -> logos.json
+python3 transcribe_recap.py   # Whisper FR sur les LE RECAP -> recap_speech.json
+# -> editer config.json (family + texte reformulé) et captions_fr.json
+python3 batch.py              # rendu -> out/skyrock/
+```
+
+**Point de coupe.** La fin de la prise de parole donnée par Whisper coïncide
+avec la disparition du présentateur (vérifié image par image : à +0,5 s il n'est
+déjà plus là et le carton du sujet démarre). `cut_at()` s'appuie donc dessus.
+`-ss` est placé **avant** `-i`, donc il ne s'applique qu'à la vidéo et remet les
+timestamps à zéro — la fenêtre du rectangle de texte se compte à partir de 0.
+
+⚠️ **`detect_logo.py` ne suffit pas seul.** Les logos changent en cours de vidéo
+(SKYROCK sur un plan, PR+ sur le suivant), et les décors de studio clairs et
+fixes (murs, spots) passent le filtre « pixel clair et immobile ». Le détecteur
+prend donc l'union des fenêtres glissantes puis la plus grosse composante
+connexe — mais il bave encore sur 6 reels sur 20. Les boîtes réellement
+utilisées (`FAMILY_BOX` dans `logo_overlay.py`) ont été **mesurées à la grille
+sur des frames réelles**, pas prises du détecteur.
+
+**Non traité** : les logos Skyrock qui font partie du décor filmé (mur du studio,
+bonnette de micro) restent visibles — ce sont des objets physiques, pas des
+incrustations.
+
+**Publication** : `--project skyrock --key NEXUS` (voir la section ci-dessus).
+
+---
+
+## 💧 Pipeline D — rvpfr → LeMurSonore (`render/rvpfr/`)
+
+Quatrième chaîne, la plus simple. rvpfr appose un **filigrane « Rvp Fr »** (script
+en losange, translucide) **en bas au centre**. On le recouvre d'un badge rond
+LeMurSonore, en overlay statique sur toute la durée.
+
+```bash
+npx tsx src/scrape-reels.ts rvpfr 20 --lib library/rvpfr
+
+cd render/rvpfr
+python3 detect_logo.py    # zone du filigrane -> logos.json
+python3 batch.py          # rendu -> out/rvpfr/
+python3 verify.py         # controle de recouvrement
+```
+
+La position du filigrane varie d'un reel à l'autre (y ≈ 1070-1250 en général,
+mais 866 sur `17` et 1035 sur `19`), d'où une détection par reel plutôt qu'une
+zone fixe — à l'inverse du pipeline C.
+
+⚠️ **`verify.py` est trop sensible.** Il signale tout pixel stable en bordure du
+badge, or beaucoup de ces reels embarquent leurs propres incrustations fixes
+(logos de chaînes, bandeaux de texte). Sur la vague du 10 août il a levé `03` et
+`17` : inspection à la grille sur les frames source **et** rendues → le losange
+« Rvp Fr » était intégralement recouvert dans les deux cas, le « résidu » étant
+le rond rouge et le texte « …eka offi » appartenant à la vidéo d'origine. Un
+signalement de ce script demande une vérification visuelle, ce n'est pas un
+verdict.
+
+**Publication** : `--project rvpfr --key LEMURSONORE`.
+
+---
+
 ## Cas particuliers / décisions par défaut
 
 - **Reels sans parole** (concert, musique, danse) → pas de sous-titres.
@@ -215,9 +378,17 @@ sous-titres** — le reste est automatique.
 ```
 assets/logo.png            logo M (fourni)
 .env                       APIFY_TOKEN (gitignoré)
-src/scrape-reels.ts        étape 1 (scrape + fallback yt-dlp)
+src/scrape-reels.ts        étape 1 (scrape + fallback yt-dlp, option --lib)
 src/post.ts                étape 7 (publie/programme via Zernio)
-library/                   mp4 bruts + index.json (gitignoré)
+library/                   mp4 bruts sonotradehq + index.json (gitignoré)
+library/rapminute/         mp4 bruts rap.minute + index.json (gitignoré)
+render/rapminute/          pipeline B (DA violette) :
+  detect_green.py            pixels verts de marque  -> green.json
+  detect_hook.py             bloc de texte complet   -> hooks.json
+  hooks_fr.json              NOS hooks (édité à la main, *mot* = violet)
+  hook_overlay.py            moteur bande + texte violet
+  batch.py                   rendu -> out/rapminute/
+  verify.py                  contrôle : 0 vert résiduel
 render/
   detect.py                détection bloc vidéo (haut/bas)
   prep.py / augment_prep.py prep.json + frames de lecture
