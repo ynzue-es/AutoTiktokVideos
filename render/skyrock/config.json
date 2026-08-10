@@ -1,0 +1,49 @@
+{
+  "_doc": [
+    "family : quelle boite de FAMILY_BOX (logo_overlay.py) recouvre le bandeau",
+    "  de marque de ce reel. 'studio' = SKYROCK/PLANETE RAP/PR+, 'recap' =",
+    "  badge LE RECAP, 'karaoke' = badge KARAOKE.",
+    "text : reels LE RECAP uniquement. Le presentateur commente en voix off ;",
+    "  on reformule son propos (source : recap_speech.json + les cartons a",
+    "  l'ecran) et on l'affiche pendant sa prise de parole.",
+    "Retirer une entree = le reel n'est pas rendu."
+  ],
+  "00-Dbz9ekDN60O.mp4": { "family": "studio" },
+  "01-Db0AW3HD7L9.mp4": { "family": "studio" },
+  "02-Db1DyI0tM5x.mp4": { "family": "studio" },
+  "03-Db0fx1pNd8J.mp4": { "family": "studio" },
+  "04-Db0RhTfE3mZ.mp4": { "family": "studio" },
+  "05-Db0s7f5mUXW.mp4": {
+    "family": "recap",
+    "text": "regardez bien cette dame : snoop dogg l'a rendue complètement zinzin 😭"
+  },
+  "06-Db0pfZOmnAe.mp4": {
+    "family": "recap",
+    "text": "même ronisia est à fond sur le « coco chanel » de meryl et eva 🔥"
+  },
+  "07-Db0wWTpD2Nr.mp4": {
+    "family": "recap",
+    "text": "akon écoute la musique de son fils… et tout est écrit sur son visage 😬"
+  },
+  "08-Db1BiSmAJDk.mp4": { "family": "studio" },
+  "09-DbyIJsyAg4u.mp4": {
+    "family": "recap",
+    "text": "on ne compte plus les chutes de cardi b sur scène 😭"
+  },
+  "10-DbyLm7wAMuO.mp4": {
+    "family": "recap",
+    "text": "jules koundé pensait se balader tranquillement dans paris… raté 😅"
+  },
+  "11-DbyjB8etgFH.mp4": { "family": "studio" },
+  "12-Dbx6ZeXEe4Y.mp4": { "family": "karaoke" },
+  "13-DbyEtxHEnrl.mp4": {
+    "family": "recap",
+    "text": "le show de bad bunny à la télé vs dans le public : rien à voir 👀"
+  },
+  "14-DbyNRmjEZok.mp4": { "family": "studio" },
+  "15-Dbyh3u0DU5k.mp4": { "family": "studio" },
+  "16-Dbxfj6wtJ4_.mp4": { "family": "studio" },
+  "17-Dbx7CNctwbs.mp4": { "family": "studio" },
+  "18-Dbv9ne_tZ_k.mp4": { "family": "studio" },
+  "19-DbxbfBxj1pd.mp4": { "family": "studio" }
+}
