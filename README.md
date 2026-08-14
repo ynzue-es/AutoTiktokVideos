@@ -1,11 +1,23 @@
-# LeMurSonore — Pipeline reels FR
+# LeMurSonore — Pipelines reels FR
 
-Scrape les reels d'un compte Instagram "faux tweet", **rebrande** en LeMurSonore,
-**traduit** le texte du tweet en FR et **sous-titre** en français la parole
-anglaise — tout en gardant l'audio original.
+Scrape les reels de comptes Instagram, **retire leur marque**, **rebrande** en
+LeMurSonore et **programme** la publication sur TikTok — en gardant l'audio
+original.
 
-Format source visé : carte "faux tweet" (en-tête compte + texte + vidéo carrée
-en dessous, sur fond noir). Testé sur `@sonotradehq`.
+**Quatre chaînes indépendantes**, une par compte source, chacune avec sa propre
+librairie, ses rendus et son journal anti-doublon :
+
+| | Source | Marque à retirer | Traitement | Section |
+|---|---|---|---|---|
+| **A** | `sonotradehq` | en-tête « faux tweet » | rebrand + traduction FR + sous-titres | §1-7 |
+| **B** | `rap.minute` | hook vert `#00D392` | bande opaque + hook réécrit en violet | ci-dessous |
+| **C** | `skyrockfm` | bandeau haut-droit | badge + coupe de l'intro présentateur | ci-dessous |
+| **D** | `rvpfr` | filigrane bas-centre | badge rond statique | ci-dessous |
+
+Les étapes §1 à §7 décrivent la chaîne A en détail ; les pipelines B, C et D
+réutilisent le même socle (scrape, overlay PIL, publication) et sont documentés
+dans leurs sections propres. **Exploitation courante** (comptes, replanification,
+contrôles) : voir la section 🎛️ plus bas.
 
 ---
 
@@ -23,10 +35,21 @@ Secrets dans `.env` à la racine (gitignoré) :
 
 ```
 APIFY_TOKEN=apify_api_xxxxxxxxxxxxxxxxx
-ZERNIO_API_KEY=sk_xxxxxxxx          # publication (étape 7)
+# --- compte par defaut (pipeline A) ---
+ZERNIO_API_KEY=sk_xxxxxxxx          # publication (etape 7)
 ZERNIO_TIKTOK_ACCOUNT=xxxxxxxx      # accountId TikTok (GET /api/v1/accounts)
 ZERNIO_IG_ACCOUNT=xxxxxxxx          # accountId Instagram (compte Business requis)
+# --- un jeu par compte supplementaire, suffixe repris par --key ---
+ZERNIO_API_KEY_BOUTIQUE=sk_xxxxxxxx
+ZERNIO_TIKTOK_ACCOUNT_BOUTIQUE=xxxxxxxx
 ```
+
+⚠️ **Pas de commentaire en fin de ligne.** `post.ts` lit tout ce qui suit le `=`
+jusqu'au saut de ligne : un `# …` collé derriere une cle finirait dans sa valeur
+et casserait l'authentification. Les commentaires vont **au-dessus**.
+
+Zernio est **gratuit jusqu'a 2 comptes sociaux**, puis facture par palier
+(6 $/compte de 3 a 10, 3 $ de 11 a 100, 1 $ au-dela).
 
 Le logo doit être dans `assets/logo.png` (M noir sur fond blanc/transparent).
 
@@ -280,27 +303,54 @@ badge LeMurSonore. Deux formats coexistent dans le compte :
 
 | Format | Reels | Traitement |
 |---|---|---|
-| **studio** (artiste au micro) | 00-04, 08, 11, 14-19 | badge logo seul |
-| **LE RÉCAP** (présentateur en voix off) | 05, 06, 07, 09, 10, 13 | badge + **coupe de l'intro** + rectangle de texte |
-| **karaoke** | 12 | badge logo seul |
+| **studio** (artiste au micro) | s1 : 00-04, 08, 11, 14-19 · s2 : 12 reels | badge logo seul |
+| **LE RÉCAP** (présentateur incrusté) | s1 : 05-07, 09, 10, 13 · s2 : 15 reels | badge + **coupe de l'intro** + rectangle de texte |
+| **karaoke** | s1 : 12 | badge logo seul |
 
-Sur les LE RÉCAP, un présentateur ouvre la vidéo face caméra. On **coupe toute
-son intro** et on affiche à la place son propos reformulé dans un rectangle de
-texte, pendant 4,5 s.
+Sur les LE RÉCAP, un présentateur ouvre la vidéo, incrusté en bas du cadre avec
+ses sous-titres brûlés, un tampon de date et un logo Snapchat ; puis il
+disparaît et la vidéo passe sur les images avec un carton de sujet. On **coupe
+toute son intro** — ce qui élimine du même coup le tampon et le logo Snapchat —
+et on affiche son propos reformulé dans un rectangle de texte, pendant 4,5 s.
+
+### Stocks
+
+Une **vague de scraping = un stock**, isolé de bout en bout. On n'écrase jamais
+un stock existant : `scrape-reels.ts` purge les mp4 absents du nouvel index, et
+les noms de fichiers (`NN-shortcode.mp4`) servent de clé au journal
+anti-doublon — re-scraper en place décalerait les `NN` et reposterait du déjà
+publié.
+
+| Stock | Librairie | Rendus | Config / légendes | Journal |
+|---|---|---|---|---|
+| 1 | `library/skyrockfm-stock1/` (20) | `out/skyrock/` | `config.json` / `captions_fr.json` | `posted.json` |
+| 2 | `library/skyrockfm-stock2/` (31) | `out/skyrock2/` | `config2.json` / `captions_fr2.json` | `posted2.json` |
+
+`render/skyrock/stock.py` résout ces chemins ; tous les scripts acceptent
+`--stock N` (défaut 1).
 
 ```bash
-npx tsx src/scrape-reels.ts skyrockfm 20 --lib library/skyrockfm
+# nouveau stock : scraper large, puis dédupliquer par shortCode contre l'ancien
+npx tsx src/scrape-reels.ts skyrockfm 50 --lib library/skyrockfm-stock2
 
 cd render/skyrock
-python3 detect_logo.py        # degrossit la zone du bandeau -> logos.json
-python3 transcribe_recap.py   # Whisper FR sur les LE RECAP -> recap_speech.json
-# -> editer config.json (family + texte reformulé) et captions_fr.json
-python3 batch.py              # rendu -> out/skyrock/
+python3 detect_logo.py --stock 2       # degrossit la zone du bandeau -> logos2.json
+# -> ecrire config2.json (family par reel + reels ecartes)
+python3 transcribe_recap.py --stock 2  # Whisper FR sur les LE RECAP -> recap_speech2.json
+# -> completer config2.json (texte reformulé) et captions_fr2.json
+python3 batch.py --stock 2             # rendu -> out/skyrock2/
 ```
 
-**Point de coupe.** La fin de la prise de parole donnée par Whisper coïncide
-avec la disparition du présentateur (vérifié image par image : à +0,5 s il n'est
-déjà plus là et le carton du sujet démarre). `cut_at()` s'appuie donc dessus.
+**Point de coupe.** Le présentateur parle d'une traite depuis `t=0`, puis se
+tait et la vidéo enchaîne sur les images. `cut_at()` garde donc la **première
+salve continue** de Whisper (seuil de silence 0,8 s) — surtout pas `segs[-1]`,
+car l'audio du contenu (interview, live) est lui aussi transcrit et emporterait
+presque toute la vidéo. Reste un cas où même ça déborde, quand le contenu
+enchaîne sans silence : la clé `cut` de `config.json` force alors la valeur.
+Sur le stock 2, un reel sur 15 était dans ce cas (`45`, 9,2 s détectés contre
+5,2 s réels) — **chaque coupe est vérifiée sur une planche avant/après avant de
+rendre.**
+
 `-ss` est placé **avant** `-i`, donc il ne s'applique qu'à la vidéo et remet les
 timestamps à zéro — la fenêtre du rectangle de texte se compte à partir de 0.
 
@@ -314,9 +364,17 @@ sur des frames réelles**, pas prises du détecteur.
 
 **Non traité** : les logos Skyrock qui font partie du décor filmé (mur du studio,
 bonnette de micro) restent visibles — ce sont des objets physiques, pas des
-incrustations.
+incrustations. Sur le stock 2 c'est le cas des **12 reels studio sur 12** : le
+micro est floqué SKYROCK et la bonnette bouge, donc aucun overlay statique ne
+peut la couvrir. Assumé, comme sur le stock 1.
 
-**Publication** : `--project skyrock --key NEXUS` (voir la section ci-dessus).
+**Reels écartés du stock 2** (4 sur 31) : bandeau hors charte (Difool Radio
+Libre), aucun bandeau à rebrander (dessins animés), décor physique SKYROCK plein
+cadre. Les raisons sont dans `_comment` de `config2.json`.
+
+**Publication** : `--project skyrock --key NEXUS` pour le stock 1,
+`--project skyrock2 --key NEXUS` pour le stock 2 (même compte, journaux
+séparés).
 
 ---
 
@@ -352,6 +410,95 @@ verdict.
 
 ---
 
+## 🎛️ Exploitation courante (comptes, replanification, contrôles)
+
+### Qui poste quoi
+
+Un compte Zernio par pipeline. **Aucun compte Instagram n'est rattaché aux trois
+nouveaux workspaces** → ils publient sur TikTok uniquement (`post.ts` le détecte
+seul). Les pseudos se ressemblent beaucoup : se fier au suffixe de clé, pas au
+nom affiché (tous s'appellent « Le Mur Sonore »).
+
+| Clé `.env` | TikTok | Pipeline | `--project` | Créneaux |
+|---|---|---|---|---|
+| `ZERNIO_API_KEY` | @lemursonore | A — sonotradehq | `fr` | 19h00 |
+| `…_BOUTIQUE` | @lemursonoreee | B — rap.minute | `rapminute` | 12h30 |
+| `…_NEXUS` | @lemursonoree | C — skyrockfm | `skyrock`, `skyrock2` | 12h00 + 18h30 |
+| `…_LEMURSONORE` | @lemursonorefr | D — rvpfr | `rvpfr` | 21h00 |
+
+Vérifier que deux clés ne pointent pas sur le même compte : comparer le
+`platformUserId` (l'`openId` TikTok), **pas** `displayName`.
+
+```bash
+set -a; . ./.env; set +a
+curl -s -H "Authorization: Bearer $ZERNIO_API_KEY_NEXUS" \
+  https://zernio.com/api/v1/accounts | python3 -m json.tool | head -40
+```
+
+### Auditer la file
+
+```bash
+set -a; . ./.env; set +a
+curl -s -H "Authorization: Bearer $ZERNIO_API_KEY_NEXUS" \
+  "https://zernio.com/api/v1/posts?limit=200" > /tmp/z.json
+python3 - <<'PY'
+import json, datetime, collections
+P = datetime.timezone(datetime.timedelta(hours=2))   # Paris ete
+p = json.load(open("/tmp/z.json"))["posts"]
+d = sorted(datetime.datetime.fromisoformat(x["scheduledFor"].replace("Z", "+00:00")).astimezone(P)
+           for x in p if x["status"] == "scheduled")
+print(collections.Counter(x["status"] for x in p))
+print(f"{len(d)} programmes : {d[0]:%d/%m %H:%M} -> {d[-1]:%d/%m %H:%M}")
+print("doublons de creneau :", len(d) - len(set(d)))
+print("jours a != 2 posts :", {k: v for k, v in collections.Counter(f"{x:%d/%m}" for x in d).items() if v != 2})
+PY
+```
+
+### Déplacer ou publier un post déjà créé
+
+L'API accepte **`PUT /posts/:id`** (pas `PATCH`, qui répond 405). Le média reste
+hébergé chez Zernio : on rejoue la date sans réuploader, et elle se propage au
+niveau plateforme.
+
+```bash
+# decaler un post
+curl -X PUT -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"scheduledFor":"2026-08-25T12:30:00","timezone":"Europe/Paris"}' \
+  https://zernio.com/api/v1/posts/<ID>
+
+# publier tout de suite un creneau rate
+curl -X PUT -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"publishNow":true}' https://zernio.com/api/v1/posts/<ID>
+
+# annuler
+curl -X DELETE -H "Authorization: Bearer $KEY" https://zernio.com/api/v1/posts/<ID>
+```
+
+⚠️ Pour décaler **toute une série**, relire l'état **avant** chaque passe et
+n'appliquer qu'une fois : un post déjà déplacé à la main sera redéplacé par la
+passe globale et créera un doublon de jour (vu en vrai). Contrôler avec le script
+d'audit ci-dessus juste après.
+
+### Le premier post part demain, pas aujourd'hui
+
+`post.ts` ancre la première date à **demain** (`baseDate()`). Pour démarrer le
+jour même ou reprendre une file existante : `--start 2026-08-22`.
+
+### Contrôler l'audio des sources
+
+`scrape-reels.ts` teste la *présence* d'un flux audio, pas le *signal*. Un reel
+peut arriver avec une piste vide (Instagram sert parfois un flux de 5 kb/s à
+-91 dB quand la musique a été retirée) et passer le filtre. Avant de programmer :
+
+```bash
+for f in out/<projet>/*.mp4; do
+  m=$(ffmpeg -hide_banner -i "$f" -af volumedetect -f null - 2>&1 | grep mean_volume)
+  echo "$(basename $f) $m"
+done          # < -60 dB = muet, a ecarter
+```
+
+---
+
 ## Cas particuliers / décisions par défaut
 
 - **Reels sans parole** (concert, musique, danse) → pas de sous-titres.
@@ -377,28 +524,52 @@ verdict.
 
 ```
 assets/logo.png            logo M (fourni)
-.env                       APIFY_TOKEN (gitignoré)
-src/scrape-reels.ts        étape 1 (scrape + fallback yt-dlp, option --lib)
-src/post.ts                étape 7 (publie/programme via Zernio)
-library/                   mp4 bruts sonotradehq + index.json (gitignoré)
-library/rapminute/         mp4 bruts rap.minute + index.json (gitignoré)
-render/rapminute/          pipeline B (DA violette) :
+.env                       APIFY_TOKEN + 4 cles Zernio (gitignore)
+src/scrape-reels.ts        scrape + fallback yt-dlp (option --lib obligatoire)
+src/post.ts                publie/programme via Zernio (--project / --key / --slots)
+
+library/                   SOURCES, toutes gitignorees — un dossier par compte
+  library/                   sonotradehq      (pipeline A)
+  library/rapminute/         rap.minute       (pipeline B)
+  library/skyrockfm-stock1/  skyrockfm vague 1 (pipeline C)
+  library/skyrockfm-stock2/  skyrockfm vague 2 (pipeline C)
+  library/rvpfr/             rvpfr            (pipeline D)
+
+render/                    pipeline A (faux tweet -> FR) :
+  detect.py                  detection bloc video (haut/bas)
+  prep.py / augment_prep.py  prep.json + frames de lecture
+  translations.json          titres FR (edite a la main)
+  transcribe.py / transcribe_all.py   Whisper -> transcripts.json
+  build_subs.py              table FR sous-titres -> subs_fr.json
+  subtitles.py               decoupe cues + PNG sous-titres
+  tweet_overlay.py           moteur d'overlay commun (header, footer, subs, emoji)
+  batch.py                   rendu -> out/fr/
+  posted.json                journal anti-doublon
+
+render/rapminute/          pipeline B (DA violet fluo) :
   detect_green.py            pixels verts de marque  -> green.json
   detect_hook.py             bloc de texte complet   -> hooks.json
-  hooks_fr.json              NOS hooks (édité à la main, *mot* = violet)
+  hooks_fr.json              NOS hooks (a la main, *mot* = violet)
   hook_overlay.py            moteur bande + texte violet
-  batch.py                   rendu -> out/rapminute/
-  verify.py                  contrôle : 0 vert résiduel
-render/
-  detect.py                détection bloc vidéo (haut/bas)
-  prep.py / augment_prep.py prep.json + frames de lecture
-  translations.json        titres FR (édité à la main)
-  transcribe.py / transcribe_all.py  Whisper → transcripts.json
-  build_subs.py            table FR sous-titres → subs_fr.json
-  subtitles.py             découpe cues + PNG sous-titres
-  tweet_overlay.py         moteur d'overlay (header, footer, subs)
-  batch.py                 rendu final → out/fr/
-  posted.json              journal anti-doublon des vidéos déjà programmées
-montage/                   utilitaires ffmpeg (crop vertical) — réserve
-out/fr/                    vidéos finales (gitignoré)
+  batch.py / verify.py       rendu -> out/rapminute/ ; controle 0 vert residuel
+
+render/skyrock/            pipeline C (badge + coupe d'intro) :
+  stock.py                   resolution des chemins par stock (--stock N)
+  detect_logo.py             degrossit la zone du bandeau -> logos*.json
+  transcribe_recap.py        Whisper FR sur les LE RECAP -> recap_speech*.json
+  logo_overlay.py            badge LeMurSonore + rectangle de texte (FAMILY_BOX)
+  batch.py                   rendu -> out/skyrock/ et out/skyrock2/
+  config.json  / config2.json        family + texte reformule + cut (a la main)
+  captions_fr.json / captions_fr2.json   legendes publiees (a la main)
+  posted.json  / posted2.json        journaux anti-doublon (un par stock)
+
+render/rvpfr/              pipeline D (filigrane bas-centre) :
+  detect_logo.py             localise le filigrane -> logos.json
+  logo_overlay.py            badge rond, overlay statique
+  batch.py / verify.py       rendu -> out/rvpfr/
+  captions_fr.json           legendes publiees (a la main)
+
+montage/                   utilitaires ffmpeg (crop vertical) — reserve
+out/                       RENDUS, tous gitignores :
+  out/fr/  out/rapminute/  out/skyrock/  out/skyrock2/  out/rvpfr/
 ```
