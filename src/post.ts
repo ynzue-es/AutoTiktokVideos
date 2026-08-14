@@ -57,8 +57,17 @@ const PROJECTS: Record<string, {
   skyrock: {
     out: "out/skyrock",
     texts: "render/skyrock/captions_fr.json", kind: "map",
-    index: "library/skyrockfm/index.json",
+    index: "library/skyrockfm-stock1/index.json",
     ledger: "render/skyrock/posted.json",
+    hashtags: "#rap #rapfr #freestyle #musique #lemursonore",
+  },
+  // vague 2 : stock isolé (librairie, rendus et journal séparés) — cf.
+  // render/skyrock/stock.py. Même compte que "skyrock" (clé NEXUS).
+  skyrock2: {
+    out: "out/skyrock2",
+    texts: "render/skyrock/captions_fr2.json", kind: "map",
+    index: "library/skyrockfm-stock2/index.json",
+    ledger: "render/skyrock/posted2.json",
     hashtags: "#rap #rapfr #freestyle #musique #lemursonore",
   },
   rvpfr: {

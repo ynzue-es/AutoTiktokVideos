@@ -15,17 +15,23 @@ ROOT = HERE.parent.parent
 sys.path.insert(0, str(ROOT / "render"))
 from transcribe import transcribe  # noqa: E402
 
-LIB = ROOT / "library" / "skyrockfm"
-OUT = HERE / "recap_speech.json"
+from stock import current  # noqa: E402
 
-# reels au format "LE RECAP" reperes sur les planches-contacts
-RECAP = ["05", "06", "07", "09", "10", "13"]
+STOCK, _ = current()
+LIB = STOCK.lib
+OUT = STOCK.speech
+
+# reels "LE RECAP" du stock : lus dans config.json (family == "recap")
+RECAP = sorted(
+    f for f, c in json.loads(STOCK.config.read_text()).items()
+    if not f.startswith("_") and c.get("family") == "recap"
+)
 
 
 def main():
     out = {}
-    for pref in RECAP:
-        f = next(LIB.glob(f"{pref}-*.mp4"))
+    for name in RECAP:
+        f = LIB / name
         segs, info = transcribe(str(f), language="fr")
         out[f.name] = [{"start": s["start"], "end": s["end"], "fr": s["en"]}
                        for s in segs]

@@ -23,10 +23,13 @@ from pathlib import Path
 
 import numpy as np
 
+from stock import current  # noqa: E402
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-LIB = ROOT / "library" / "skyrockfm"
-OUT = HERE / "logos.json"
+STOCK, _ = current()
+LIB = STOCK.lib
+OUT = STOCK.logos
 
 STEP = 0.5
 BRIGHT = 195

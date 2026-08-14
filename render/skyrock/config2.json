@@ -1,0 +1,107 @@
+{
+  "_comment": [
+    "Stock 2 skyrockfm. family -> boite de couverture (logo_overlay.FAMILY_BOX).",
+    "recap : le presentateur est incruste en bas pendant l'intro puis disparait.",
+    "  'text' = son propos reformule, affiche apres la coupe. Le trim vient de",
+    "  recap_speech2.json (fin de sa prise de parole).",
+    "Reels ecartes (non rendus) : 02 = badge Difool Radio Libre, hors charte + 67s; 13 = dessin anime, aucun bandeau a rebrander; 17 = decor physique SKYROCK plein cadre, non masquable; 21 = dessin anime, aucun bandeau a rebrander",
+    "'cut' force le point de coupe quand la salve Whisper deborde sur l'audio du contenu (45)."
+  ],
+  "00-Db_VRVjCZ1L.mp4": {
+    "family": "studio"
+  },
+  "03-Db_DipFiQ0W.mp4": {
+    "family": "recap",
+    "text": "miss thaïlande débarque en mode hip-hop"
+  },
+  "04-Db_AHEGjMtt.mp4": {
+    "family": "recap",
+    "text": "quand tu te fais sortir du concert d'orelsan"
+  },
+  "05-Db8evBaDFzm.mp4": {
+    "family": "recap",
+    "text": "rosalía balance un « wesh le 69 » en plein concert à lyon"
+  },
+  "06-Db7rP7CEU9N.mp4": {
+    "family": "studio"
+  },
+  "07-Db5zFR8kanR.mp4": {
+    "family": "recap",
+    "text": "le nouveau bolide de fally ipupa fait tourner les têtes"
+  },
+  "08-Db8bX8VClED.mp4": {
+    "family": "recap",
+    "text": "bamby offre une danse que ce fan n'oubliera jamais"
+  },
+  "09-Db52kTXFAlV.mp4": {
+    "family": "recap",
+    "text": "il utilise la mano 1.9 pour parler de ses conquêtes"
+  },
+  "10-Db6QQp8AF5C.mp4": {
+    "family": "studio"
+  },
+  "11-Db5MIMJNAL2.mp4": {
+    "family": "studio"
+  },
+  "12-Db558RyFEZo.mp4": {
+    "family": "recap",
+    "text": "oscar du meilleur acteur le soir, fast-food juste après"
+  },
+  "14-Db8X3SijN4Y.mp4": {
+    "family": "recap",
+    "text": "ce fan a capté absolument tous les gestes de nono la grinta"
+  },
+  "15-Db8lnbvEqMp.mp4": {
+    "family": "studio"
+  },
+  "16-Db-8rZeE0YT.mp4": {
+    "family": "recap",
+    "text": "le tournage du clip de mous-k et gazo stoppé par la police"
+  },
+  "18-Db3OZHoDqFX.mp4": {
+    "family": "recap",
+    "text": "cardi b joue de la guitare... sauf qu'il n'y a pas de guitare"
+  },
+  "19-Db2hqA7DcYK.mp4": {
+    "family": "studio"
+  },
+  "20-Db3rf29N1p5.mp4": {
+    "family": "studio"
+  },
+  "22-Db3fc_zjohg.mp4": {
+    "family": "studio"
+  },
+  "23-Db3RvzCDlF9.mp4": {
+    "family": "recap",
+    "text": "pnl contre bigflo & oli : lequel est le meilleur clash ?"
+  },
+  "24-Db48JFSDL0w.mp4": {
+    "family": "studio"
+  },
+  "25-Db3SWImNMv5.mp4": {
+    "family": "studio"
+  },
+  "26-Db3VJEZjWIt.mp4": {
+    "family": "recap",
+    "text": "anyme comptait les mouches en pleine fashion week"
+  },
+  "30-Db2iN7ANB-P.mp4": {
+    "family": "studio"
+  },
+  "43-DbvmxH2CGMW.mp4": {
+    "family": "recap",
+    "text": "cardi b se fait renverser par un robot"
+  },
+  "45-Dbvf55BmDut.mp4": {
+    "family": "recap",
+    "text": "est-ce que bad bunny fait de l'effet à sabrina carpenter ?",
+    "cut": 5.2
+  },
+  "46-Dbv3962lFbG.mp4": {
+    "family": "studio"
+  },
+  "48-DbvjXzECA2W.mp4": {
+    "family": "recap",
+    "text": "la mano 1.9 contre un éléphant : voici le gagnant"
+  }
+}
