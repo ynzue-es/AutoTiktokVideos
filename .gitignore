@@ -6,3 +6,5 @@ library/
 *.log
 scratch-frames/
 __pycache__/
+render/reels/cache/
+render/reels/*.wav

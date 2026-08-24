@@ -4,8 +4,9 @@ Scrape les reels de comptes Instagram, **retire leur marque**, **rebrande** en
 LeMurSonore et **programme** la publication sur TikTok — en gardant l'audio
 original.
 
-**Quatre chaînes indépendantes**, une par compte source, chacune avec sa propre
-librairie, ses rendus et son journal anti-doublon :
+**Quatre chaînes de rebranding**, une par compte source, chacune avec sa propre
+librairie, ses rendus et son journal anti-doublon — plus **une chaîne de
+création** qui ne scrape rien et fabrique le reel depuis le catalogue :
 
 | | Source | Marque à retirer | Traitement | Section |
 |---|---|---|---|---|
@@ -13,11 +14,13 @@ librairie, ses rendus et son journal anti-doublon :
 | **B** | `rap.minute` | hook vert `#00D392` | bande opaque + hook réécrit en violet | ci-dessous |
 | **C** | `skyrockfm` | bandeau haut-droit | badge + coupe de l'intro présentateur | ci-dessous |
 | **D** | `rvpfr` | filigrane bas-centre | badge rond statique | ci-dessous |
+| **E** | *le catalogue* | — | plan UGC généré + affiche incrustée + décomposition | ci-dessous |
 
 Les étapes §1 à §7 décrivent la chaîne A en détail ; les pipelines B, C et D
 réutilisent le même socle (scrape, overlay PIL, publication) et sont documentés
-dans leurs sections propres. **Exploitation courante** (comptes, replanification,
-contrôles) : voir la section 🎛️ plus bas.
+dans leurs sections propres. Le pipeline E est indépendant des quatre autres :
+il part de `../ScriptsShopify` et non d'Instagram. **Exploitation courante**
+(comptes, replanification, contrôles) : voir la section 🎛️ plus bas.
 
 ---
 
@@ -38,7 +41,7 @@ APIFY_TOKEN=apify_api_xxxxxxxxxxxxxxxxx
 # --- compte par defaut (pipeline A) ---
 ZERNIO_API_KEY=sk_xxxxxxxx          # publication (etape 7)
 ZERNIO_TIKTOK_ACCOUNT=xxxxxxxx      # accountId TikTok (GET /api/v1/accounts)
-ZERNIO_IG_ACCOUNT=xxxxxxxx          # accountId Instagram (compte Business requis)
+# ZERNIO_IG_ACCOUNT=xxxxxxxx        # Instagram : desactive (voir plus bas)
 # --- un jeu par compte supplementaire, suffixe repris par --key ---
 ZERNIO_API_KEY_BOUTIQUE=sk_xxxxxxxx
 ZERNIO_TIKTOK_ACCOUNT_BOUTIQUE=xxxxxxxx
@@ -149,15 +152,20 @@ Régénérer après n'importe quelle modif de texte/traduction : `python3 batch.
 
 ---
 
-## 7. Publier / programmer sur TikTok + Instagram  →  Zernio
+## 7. Publier / programmer sur TikTok  →  Zernio
 
 Publication via **Zernio** (API REST, gratuit pour 2 comptes) : Zernio héberge la
 vidéo et gère l'auth des plateformes — **pas de Make, pas de stockage externe, pas
 d'app Meta/TikTok à faire valider**. Flux par vidéo : `presign → PUT upload →
-POST /posts` (TikTok + IG).
+POST /posts`.
 
-Clés dans `.env` : `ZERNIO_API_KEY`, `ZERNIO_TIKTOK_ACCOUNT`, `ZERNIO_IG_ACCOUNT`
-(récupérer les accountId via `GET https://zernio.com/api/v1/accounts`).
+Clés dans `.env` : `ZERNIO_API_KEY`, `ZERNIO_TIKTOK_ACCOUNT` (récupérer les
+accountId via `GET https://zernio.com/api/v1/accounts`).
+
+**Instagram est coupé** (14/08/2026) : `ZERNIO_IG_ACCOUNT` est commentée dans
+`.env`, donc `post.ts` ne cible plus que TikTok. Le code sait publier sur IG —
+décommenter la clé suffit à le rallumer. Le compte `@lemursonoreee` reste
+connecté côté Zernio (analytics), il ne reçoit simplement plus rien de nous.
 
 ```bash
 npx tsx src/post.ts                         # DRY-RUN (défaut) : montre le planning, ne poste rien
@@ -410,14 +418,285 @@ verdict.
 
 ---
 
+## 🖼️ Pipeline E — reels produit boutique (`render/reels/`)
+
+Le seul pipeline qui ne scrape rien : il **fabrique** le reel à partir du
+catalogue lemursonore.fr. Un plan filmé par IA sert d'accroche, l'affiche du
+catalogue s'y incruste, puis elle se décompose à l'écran.
+
+**La règle qui gouverne tout le pipeline : on ne fait JAMAIS générer l'affiche
+par un modèle vidéo.** Une diffusion redessine le texte à chaque image ; une
+tracklist et un nom d'artiste en ressortent en charabia. Le modèle produit une
+scène avec un cadre **vide**, et le fichier exact du catalogue est posé dedans
+en post-production. Conséquence : un plan généré une fois sert pour n'importe
+laquelle des 50 000 fiches.
+
+```bash
+# la chaîne complète, une fois le plan généré (cf. §E.1)
+V=ScriptsShopify/.venv/bin/python
+$V render/reels/lit_sonore.py                          # bande-son 15 s
+$V render/reels/mix.py --ugc render/reels/scenes/plan-ugc-02.mp4 \
+   --album 746059 --audio render/reels/lit-mix.wav \
+   --sortie ~/Desktop/reel.mp4
+npx tsx src/post-reel.ts --video ~/Desktop/reel.mp4 \
+   --titre "Adele · 21" --lien "https://lemursonore.fr/products/adele-21"
+```
+
+Changer d'album = changer `--album`, rien d'autre. Le plan filmé ne se
+regénère jamais : il ne contient aucune affiche.
+
+### E.1 Le plan d'accroche → `render/reels/scenes/`
+
+Généré chez **ElevenLabs** (ElevenCreative → Image & Video), modèle **Veo 3.1
+Fast**, 9:16, 8 s, 720p, son activé, avec `scenes/cadre-vide.jpg` en image de
+référence (rôle *subject*, pas *start frame* : un start frame figerait la
+première image sur le gros plan du cadre et la personne n'existerait jamais).
+
+**L'API vidéo n'est PAS accessible en Starter.** `POST /v1/flows/video` répond
+`402 paid_plan_required — requires a Pro plan or above` (99 $/mois). L'interface
+web, elle, suffit avec le plan à 6 $ : le plan se génère donc à la main, en
+collant le prompt ci-dessous. Un script d'appel avait été écrit puis retiré —
+il ne servirait qu'après un passage au plan Pro, et le prompt qu'il portait est
+consigné ici.
+
+**L'API text-to-speech, elle, marche en Starter** (~1 crédit par caractère) :
+refaire une réplique en TTS coûte une centaine de crédits contre 7 272 pour
+regénérer la vidéo. Utile quand seule la diction est à reprendre.
+
+**Coût mesuré : 7 272 crédits** pour 8 s / 720p / son, soit ~5 générations sur
+les 40 000 du Starter. Aucun tarif n'est publié par ElevenLabs : le script
+relève le solde avant et après pour le mesurer.
+
+Trois exigences dans le prompt, et chacune a une raison mécanique :
+
+| Exigence | Pourquoi |
+|---|---|
+| cadre **vide**, plat, frontal | le quadrilatère à relever reste presque un rectangle |
+| la personne reste **à côté**, ne passe jamais devant | la zone du cadre doit être identique sur toutes les images |
+| caméra **fixe** | un travelling obligerait à re-relever le cadre image par image |
+
+**Payé le 24/08/2026 : écrire la réplique française SANS ses accents.** Le
+prompt les avait perdus — « mon album prefere ici » est ressorti prononcé à
+l'anglaise, puis « préfère » au lieu de « préféré ». Le modèle n'y était pour
+rien : les trois plans ont été générés avec le même Veo 3.1 Fast, et remettre
+les accents a suffi à rendre la diction juste. **La réplique se copie avec ses
+accents, toujours.**
+
+**Payé le même jour : une réplique trop courte fait improviser le modèle.**
+Le premier prompt donnait 3 s de texte pour un plan de 8 s. Veo a comblé les
+5 s restantes en piochant dans la description du décor, et la comédienne a
+annoncé que le cadre était vide — exactement ce que la vidéo s'emploie à
+contredire. La parade tient en trois points : une réplique qui **remplit la durée**,
+l'interdiction explicite du sujet (« she must never say the frame is empty »),
+et une consigne sur ce qu'elle fait **pendant le silence de fin** — sans quoi
+le modèle comble ce vide en parlant.
+
+**Payé aussi : ne pas dire ce qu'elle fait pendant le silence de fin.** Même
+avec une réplique de la bonne longueur, le modèle remplit ce qui reste. La
+phrase « she finishes speaking around 5 seconds, then simply smiles and glances
+at the frame in silence until the end » est ce qui a réglé le problème pour de
+bon.
+
+**Le champ prompt de l'interface web plafonne à ~450 caractères sur certains
+écrans et pas sur d'autres.** Vérifier que le texte collé n'est pas tronqué :
+au premier essai il s'était arrêté au milieu d'une phrase, sans le dire.
+
+#### Le prompt de référence
+
+Celui qui a produit `scenes/plan-ugc-02.mp4`, le plan retenu. Trois générations
+ont été payées pour l'obtenir : ce n'est pas une ébauche, c'est le texte qui
+marche. Le coller tel quel, avec ses accents.
+
+```
+Vertical 9:16 UGC video, filmed on a phone. A bright minimal living room with
+a flat white wall seen straight on, frontal view. On the RIGHT side of the
+frame hangs the thin black picture frame from the reference image: flat against
+the wall, perfectly rectangular, fully visible at all times, with nothing
+inside it. The frame is LARGE in the shot, filling about a third of the image
+width. On the LEFT side, a friendly woman in her twenties, casual clothes,
+stands facing the camera and speaks warmly to the viewer. She stays entirely on
+the left, she never walks in front of the frame and never covers it. Soft
+daylight, a green plant and a wooden shelf in the corner. The camera is
+completely STATIC, locked off on a tripod, no zoom, no pan, no handheld shake.
+Natural, authentic, not an advertisement.
+
+She speaks ONLY these exact French words, with these exact accents, and nothing
+else: "J'ai accroché mon album préféré ici. Franchement, ça change toute la
+pièce."
+
+She finishes speaking around 5 seconds, then simply smiles and glances at the
+frame in silence until the end. She must NEVER say, suggest or hint that the
+frame is empty, blank, white, or that there is nothing in it.
+```
+
+Negative prompt (champ séparé) :
+
+```
+artwork or poster or photo or text inside the frame, painting in the frame,
+person walking in front of the frame, hands covering the frame, tilted or
+angled frame, frame seen in perspective, curved wall, camera movement, zoom,
+pan, handheld shake, subtitles, watermark, logo, improvised dialogue, extra
+sentences, english accent, mentioning an empty frame
+```
+
+**Les accents de la réplique ne sont pas une coquetterie**, cf. le piège
+ci-dessus : c'est la seule différence entre les trois générations.
+
+### E.2 Relever le cadre → `suivi_cadre.py`
+
+`coins_droites()` ajuste **une droite sur chacun des quatre bords intérieurs**
+de la moulure, puis croise les droites. C'est la méthode des relevés manuels
+de `ScriptsShopify/images/mockup_biais.py`, faite automatiquement.
+
+**Ne PAS se contenter de l'enveloppe des pixels sombres.** C'était la première
+version : elle rendait un cadre 24 px trop large et 17 px trop haut, parce
+qu'elle prend l'extrême de la moulure et non son bord intérieur. À l'écran,
+l'affiche montait sur la moulure à droite et en bas — le cadre disparaissait de
+deux côtés.
+
+**Le relevé se fait image par image, pas une fois pour toutes.** La première
+version prenait la médiane sur tout le plan, au motif que le cadre du plan 01
+ne bougeait que d'un ou deux pixels. Le plan 02 a démenti : malgré la consigne
+de caméra bloquée, son cadre **dérive de 11 px** vers la gauche pendant les six
+premières secondes. Une position figée cale l'affiche à un instant du plan et
+laisse une bande de papier blanc à l'autre bout — et la figer là où l'image
+paraît la mieux calée ne fait que déplacer le défaut.
+
+Le bruit de détection, lui, est rapide là où la dérive est lente : les relevés
+qui s'écartent de plus de 25 px de la médiane sont remplacés (9 sur 192 sur le
+plan 02, quand la chevelure entre dans la zone), puis la trajectoire passe dans
+une moyenne glissante sur 11 images. On garde la dérive, on supprime le
+tremblement.
+
+**Le quadrilatère est dilaté de 11 px (`DEBORD`)** pour que l'affiche passe
+sous la feuillure, comme dans un vrai encadrement. Un relevé calé pile sur le
+bord intérieur laisse une bande de papier visible du côté où la moulure se voit
+en épaisseur. Pour diagnostiquer ce genre de défaut, incruster une **mire**
+(aplat vif à bord contrasté) au lieu de l'affiche : sur un album sombre comme
+`AC/DC · Back In Black`, l'affiche et le cadre sont tous deux noirs et le
+décalage est invisible à l'œil.
+
+Une zone de recherche qui suit sa propre sortie **s'élargit à la moindre erreur
+et ne revient jamais** : au premier essai elle a fini par attraper la chevelure
+de la comédienne, et 120 relevés sur 192 étaient faux. Elle est désormais
+verrouillée sur la première image, où la personne n'est pas encore entrée.
+
+### E.3 Incruster l'affiche → `mix.py`
+
+L'homographie, le masque analytique et la carte d'éclairage viennent de
+`mockup_biais` : on inscrit le relevé dans `mb.QUADS` à la volée et tout son
+travail s'applique sans modification. C'est ce qui reporte l'ombre du feuillage
+du mur sur le papier — sans quoi l'affiche a l'air d'un autocollant.
+
+**L'affiche est reprojetée à chaque image** (`poser`), puisque le cadre dérive.
+Seule la **carte d'éclairage** est calculée une fois : la lumière du mur ne
+bouge pas, et onze pixels de dérive ne la déplacent pas assez pour se voir. Le
+rendu complet prend ~30 s.
+
+### E.4 Décomposer l'affiche → `reel_affiche.py`
+
+`posters.poster()` compose l'affiche par empilement. La vidéo rejoue cet
+empilement — mais **sans toucher à `posters.py`**, qui est du code de
+production catalogue.
+
+Les couches sont obtenues par **différence** : le fond flouté et la pochette se
+recomposent à l'identique avec `blurred_bg` et `load_cover`, et tout ce qui les
+sépare de l'affiche finie est de l'encre. Ce masque est découpé en blocs par
+**projection** — on cherche les bandes vides entre les groupes de texte plutôt
+que de coder des coordonnées qui changeraient avec le nombre de titres. Le
+script marche donc sur n'importe quelle fiche, tracklist à trois colonnes
+comprise.
+
+Deux points de rendu :
+
+- **La pochette n'est jamais agrandie.** Deezer plafonne à **1200 px** (il rend
+  1200 quelle que soit la taille demandée au-delà), et un gros plan la
+  pixellisait. Elle est montrée entière à 1012 px, donc réduite.
+- **Rien d'informatif sous 80 % de la hauteur** : Reels y pose ses propres
+  surcouches.
+
+### E.5 Bande-son → `lit_sonore.py`
+
+Synthétisée de zéro en numpy : nappe d'accords, grosse caisse, souffle. Rien à
+créditer, rien à renouveler, et surtout **le tempo est connu du montage**.
+
+Tout le montage est calé sur une grille de **0,6 s (100 BPM)** : chaque
+transition tombe sur un temps fort et chaque bloc de l'affiche sur une frappe.
+Modifier une durée de `SEQ` sans rester sur la grille désynchronise le son.
+
+`poser_voix()` ajoute une voix off par la synthèse système (`say -v Thomas`),
+avec ducking du lit dessous — gratuit, hors ligne, ton d'annonce. Le montage
+`mix.py` ne l'utilise PAS : quelqu'un parle déjà à l'écran, et une voix
+synthétique par-dessus donnerait deux locuteurs pour une bouche.
+
+**La musique du commerce est hors de question** sur ce pipeline : Meta Rights
+Manager bloque la créa avant qu'elle tourne. Pour un post **organique**, le
+titre s'ajoute depuis l'app au moment de publier — Meta a les licences ; passer
+le compte en « Créateur » débloque le catalogue complet.
+
+### E.6 Monter → `mix.py`
+
+Séquence courante (15 s), et ce que chaque borne doit à la transcription du
+plan généré :
+
+```
+ 0,0 - 2,4   plan large, sous-titre sur la phrase réellement prononcée
+ 2,4 - 3,6   punch-in sur le cadre (coupe franche, puis desserrage)
+ 3,6 - 4,2   fondu croisé
+ 4,2 - 7,8   l'affiche se construit (un bloc par demi-temps)
+ 7,8 - 10,2  la même, encadrée de trois quarts
+10,2 - 13,2  le mur d'affiches en parallaxe
+13,2 - 15,0  la marque
+```
+
+**Le son du plan est conservé jusqu'à 4,0 s, puis le lit prend le relais.** La
+coupe n'est pas arbitraire : la transcription (`faster-whisper`) donne « J'ai
+accroché mon album préféré ici. » de 0,0 à 3,2 s, puis une seconde phrase
+inventée à partir de 4,1 s. La coupe tombe dans le silence qui les sépare.
+**Transcrire le plan avant de choisir les bornes**, c'est ce qui évite de
+couper au milieu d'un mot ou de garder une phrase parasite. Utiliser le modèle
+`medium` de faster-whisper, pas `small` : ce dernier a rendu « je le reviens »
+pour « je le regarde » et « Prefer » pour « préfère », soit une faute réelle
+masquée et une faute imaginaire ajoutée.
+
+Les sous-titres ne couvrent que la partie où quelqu'un parle : au-delà,
+incruster du texte ferait lire un discours qui n'existe pas.
+
+
+### E.7 Publier → `src/post-reel.ts`
+
+`post-produits.ts` ne sait poster que des carrousels d'images tirés de la
+boutique. Pour une vidéo déjà faite, `post-reel.ts` l'héberge chez Zernio et la
+publie, sur le même schéma que les autres pipelines : **dry-run par défaut**,
+`--go` pour publier, un journal anti-doublon par réseau.
+
+```bash
+npx tsx src/post-reel.ts --video ~/Desktop/reel.mp4 \
+  --titre "Adele · 21" --lien "https://lemursonore.fr/products/adele-21" --go
+# --reseau instagram    |  --at 2026-08-25T12:00 pour programmer
+```
+
+Le format reel est demandé explicitement (`platformSpecificData.postType` sur
+Facebook, `mediaType: REELS` sur Instagram), avec un **repli automatique sans ce
+champ** si la validation le refuse en 400 : une vidéo verticale de moins de 90 s
+part de toute façon en reel chez Meta.
+
+Zernio ne rend pas l'URL du post tout de suite — Meta encode d'abord. Le statut
+se relit avec `GET /api/v1/posts/{id}`, et c'est `status: published` sur la
+plateforme qui fait foi, pas la réponse du POST.
+
+Premier passage : `Adele · 21` sur la page Facebook, le 24/08/2026 à 18h48.
+
+---
+
 ## 🎛️ Exploitation courante (comptes, replanification, contrôles)
 
 ### Qui poste quoi
 
-Un compte Zernio par pipeline. **Aucun compte Instagram n'est rattaché aux trois
-nouveaux workspaces** → ils publient sur TikTok uniquement (`post.ts` le détecte
-seul). Les pseudos se ressemblent beaucoup : se fier au suffixe de clé, pas au
-nom affiché (tous s'appellent « Le Mur Sonore »).
+Un compte Zernio par pipeline, **TikTok uniquement partout** : les trois
+nouveaux workspaces n'ont jamais eu d'Instagram rattaché, et celui du pipeline A
+a été coupé le 14/08/2026 (cf. §7). Les pseudos se ressemblent beaucoup : se
+fier au suffixe de clé, pas au nom affiché (tous s'appellent « Le Mur Sonore »).
 
 | Clé `.env` | TikTok | Pipeline | `--project` | Créneaux |
 |---|---|---|---|---|
@@ -568,6 +847,15 @@ render/rvpfr/              pipeline D (filigrane bas-centre) :
   logo_overlay.py            badge rond, overlay statique
   batch.py / verify.py       rendu -> out/rvpfr/
   captions_fr.json           legendes publiees (a la main)
+
+render/reels/              pipeline E (reels produit, depuis le catalogue) :
+  suivi_cadre.py             releve les 4 coins interieurs du cadre vide
+  reel_affiche.py            decomposition de l'affiche + mur + CTA + plans
+  lit_sonore.py              bande-son synthetisee, grille 100 BPM, voix `say`
+  mix.py                     le montage : plan UGC incruste + fin de marque
+  scenes/cadre-vide.jpg      le mockup de reference a envoyer au modele
+  scenes/plan-ugc-02.mp4     LE PLAN RETENU (Veo 3.1 Fast, 8 s, 7 272 credits)
+  cache/                     covers + meta Deezer (gitignore)
 
 montage/                   utilitaires ffmpeg (crop vertical) — reserve
 out/                       RENDUS, tous gitignores :
