@@ -211,7 +211,12 @@ def flux_ugc(chemin):
         ["ffmpeg", "-v", "error", "-i", str(chemin),
          "-vf", f"fps={FPS},scale={W}:{H}:flags=lanczos",
          "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        # stdin coupé : ffmpeg le lit par défaut. Lancé depuis une boucle
+        # `while read` du shell, il avale les lignes du fichier que la boucle
+        # est en train de parcourir, et un rendu sur deux part avec les
+        # arguments du suivant.
+        stdin=subprocess.DEVNULL)
 
 
 def cadrer(img, k, cx=0.5, cy=0.5):
