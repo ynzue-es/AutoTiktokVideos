@@ -18,7 +18,7 @@
  *
  * --project : jeu de chemins (voir PROJECTS). Defaut "fr".
  * --key     : suffixe de cle .env. Defaut "" -> ZERNIO_API_KEY /
- *             ZERNIO_TIKTOK_ACCOUNT / ZERNIO_IG_ACCOUNT.
+ *             ZERNIO_TIKTOK_ACCOUNT / ZERNIO_IG_ACCOUNT_VIDEO.
  *             "BOUTIQUE" -> ZERNIO_API_KEY_BOUTIQUE / ..._BOUTIQUE.
  *             Un workspace sans compte IG poste sur TikTok seulement.
  * --slots   : creneaux/jour, ex "07:00" ou "12:30,18:00,21:00" (heure de Paris).
@@ -107,7 +107,10 @@ const env = (k: string, optional = false): string => {
 const SUF = val("--key") ? `_${val("--key")}` : "";
 const KEY = env(`ZERNIO_API_KEY${SUF}`);
 const TT = env(`ZERNIO_TIKTOK_ACCOUNT${SUF}`);
-const IG = env(`ZERNIO_IG_ACCOUNT${SUF}`, true);   // absent = workspace sans IG
+// Cle SEPAREE de ZERNIO_IG_ACCOUNT, qui sert aux carrousels produit
+// (src/post-produits.ts) : les videos sur Instagram restent coupees depuis le
+// 14/08/2026, et le retour des carrousels ne doit pas les rallumer.
+const IG = env(`ZERNIO_IG_ACCOUNT_VIDEO${SUF}`, true);   // absent = pas de video IG
 const H = { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
 
 const GO = has("--go");
